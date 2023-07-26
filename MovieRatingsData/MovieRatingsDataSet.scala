@@ -1,4 +1,4 @@
-/*Perform movie rating analysis using the Spark DataFrame*/
+/*Perform movie rating analysis using the Spark DataSet*/
 package SparkApp
 
 import org.apache.log4j._
@@ -6,8 +6,12 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions._
 
+
 /* Read the movies ratings data and perform different operations*/
-object MovieRatingsData {
+object MovieRatingsDataSet {
+
+  // Create case class with schema of u.data
+  case class MovieRatings(userID: Int, movieID: Int, rating: Int, timestamp: Long)
 
   /*Start of the program*/
   def main(args: Array[String]): Unit = {
@@ -18,36 +22,31 @@ object MovieRatingsData {
     val log = LogManager.getRootLogger()
 
     //Create a spark session to run locally using the all cores of current machine
-    val spark = SparkSession.builder().appName("MovieRatingsData").master("local[*]").getOrCreate()
+    val spark = SparkSession.builder().appName("MovieRatingsDataSet").master("local[*]").getOrCreate()
 
-    //create the schema format userID, movieID, rating, timestamp - Not used here - Just for reference
-    val mySchema = new StructType(Array(
-      new StructField("userID", StringType, true),
-      new StructField("movieID", StringType, true),
-      new StructField("rating", StringType, true),
-      new StructField("timestamp", StringType, true)
+    //create the schema format userID, movieID, rating, timestamp
+    val movieRatingsSchema = new StructType(Array(
+      new StructField("userID", IntegerType, true),
+      new StructField("movieID", IntegerType, true),
+      new StructField("rating", IntegerType, true),
+      new StructField("timestamp", LongType, true)
     )
     )
 
-    //Read the movies ratings data from file data/u.data
-    val data = spark.read.format("text")
-      .option("header", "false")
-      .option("inferSchema", "true")
-      .option("delimiter", "\t")
-      .load("data/u.data")
+    import spark.implicits._
+    //Read the movies ratings data from file data/u.data to dataSet
+    val movieDS = spark.read
+      .option("sep", "\t")
+      .schema(movieRatingsSchema)
+      .csv("data/u.data")
+      .as[MovieRatings]
 
-    //Cast the data as per the datatype
-    val dataFrame = data.select(split(col("value"), "\t").getItem(0).as("userID").cast(IntegerType),
-      split(col("value"), "\t").getItem(1).as("movieID").cast(IntegerType),
-      split(col("value"), "\t").getItem(2).as("rating").cast(IntegerType),
-      split(col("value"), "\t").getItem(3).as("timestamp").cast(LongType))
-      .drop("value")
 
     //Print the schema of data.
-    dataFrame.printSchema()
+    movieDS.printSchema()
 
     //Create a temporary view for this dataFrame.
-    dataFrame.createOrReplaceTempView("dfTable")
+    movieDS.createOrReplaceTempView("dfTable")
 
     //Perform different SQl queries
     val dataFrameSql = spark.sql("select * from dfTable")
